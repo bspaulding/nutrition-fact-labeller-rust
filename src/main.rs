@@ -81,12 +81,6 @@ fn run_ocr_rgb(image: image::RgbImage) -> Result<Vec<MyTextRegion>, String> {
     return Ok(regions.iter().map(|tr| MyTextRegion { text: tr.text.clone().unwrap().to_string(), confidence: tr.confidence.unwrap() }).collect());
 }
 
-fn run_ocr() -> Result<Vec<MyTextRegion>, String> {
-    let image = oar_ocr::utils::load_image(Path::new("images/Unknown.png"))
-        .map_err(|_| "Failed to load image")?;
-    return run_ocr_rgb(image);
-}
-
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -96,8 +90,6 @@ async fn main() {
     //     .map(|name| format!("Hello, {}!", name));
 
     let upload = warp::multipart::form()
-        // 25MB is ok...for testing large images
-        .and(warp::body::content_length_limit(1024 * 1024 * 25))
         .and_then(|form: FormData| async move {
         let field_names: Vec<_> = form
             .and_then(|mut field| async move {
