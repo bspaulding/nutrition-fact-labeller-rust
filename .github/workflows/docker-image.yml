@@ -8,7 +8,7 @@ on:
       - v*
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: bspaulding/nutrition-fact-labeller-api
+  IMAGE_NAME: bspaulding/nutrition-fact-labeller-rust
 jobs:
   build-and-publish-image:
     runs-on: ubuntu-latest
@@ -32,7 +32,7 @@ jobs:
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
           images: |
-            ghcr.io/bspaulding/nutrition-fact-labeller-api
+            ghcr.io/bspaulding/nutrition-fact-labeller-rust
           tags: |
             type=semver,pattern={{raw}}
             type=ref,event=branch
@@ -42,6 +42,7 @@ jobs:
         uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
         with:
           context: .
+          file: Containerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
