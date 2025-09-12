@@ -123,8 +123,10 @@ async fn main() {
         Ok::<_, warp::Rejection>(warp::reply::json(&map))
     });
 
+    let port: u16 = std::env::var("PORT").ok().and_then(|p| p.parse::<u16>().ok()).unwrap_or(3030);
+    info!("running and listening on {port}");
     warp::serve(upload)
-        .run(([127, 0, 0, 1], 3030))
+        .run(([127, 0, 0, 1], port))
         .await;
 }
 
