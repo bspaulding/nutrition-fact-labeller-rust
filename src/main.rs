@@ -126,7 +126,7 @@ async fn main() {
     let port: u16 = std::env::var("PORT").ok().and_then(|p| p.parse::<u16>().ok()).unwrap_or(3030);
     info!("running and listening on {port}");
     warp::serve(upload)
-        .run(([127, 0, 0, 1], port))
+        .run(([0, 0, 0, 0], port))
         .await;
 }
 
