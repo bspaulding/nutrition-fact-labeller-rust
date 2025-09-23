@@ -33,12 +33,12 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /paddleocr-models
 
 # Copy model weights
-RUN curl --output ppocrv4_mobile_det.onnx https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/ppocrv4_mobile_det.onnx
-RUN curl --output en_ppocrv4_mobile_rec.onnx https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/en_ppocrv4_mobile_rec.onnx
-RUN curl --output en_dict.txt https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/en_dict.txt
-RUN curl --output pplcnet_x1_0_doc_ori.onnx https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/pplcnet_x1_0_doc_ori.onnx
-RUN curl --output pplcnet_x1_0_textline_ori.onnx https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/pplcnet_x1_0_textline_ori.onnx
-RUN curl --output uvdoc.onnx https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/uvdoc.onnx
+RUN curl -L --output ppocrv4_mobile_det.onnx https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/ppocrv4_mobile_det.onnx
+RUN curl -L --output en_ppocrv4_mobile_rec.onnx https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/en_ppocrv4_mobile_rec.onnx
+RUN curl -L --output en_dict.txt https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/en_dict.txt
+RUN curl -L --output pplcnet_x1_0_doc_ori.onnx https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/pplcnet_x1_0_doc_ori.onnx
+RUN curl -L --output pplcnet_x1_0_textline_ori.onnx https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/pplcnet_x1_0_textline_ori.onnx
+RUN curl -L --output uvdoc.onnx https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/uvdoc.onnx
 
 # =========================
 # 2. Runtime stage
