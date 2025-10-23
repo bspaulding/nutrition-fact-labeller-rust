@@ -1,7 +1,7 @@
 # =========================
 # 0. Builder stage
 # =========================
-FROM public.ecr.aws/docker/library/rust:1.89 as builder
+FROM public.ecr.aws/docker/library/rust:1.89-bookworm as builder
 
 # Create a new empty shell project
 WORKDIR /app
@@ -17,18 +17,12 @@ RUN cargo build --release && rm -rf src
 
 # Copy source and build actual binary
 COPY src ./src
-RUN cargo build --release
+RUN cargo install --path .
 
 # =========================
 # 1. Model Download stage
 # =========================
 FROM public.ecr.aws/docker/library/debian:bookworm-slim AS downloader
-
-# Install minimal dependencies for Rust binary execution
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /paddleocr-models
 
@@ -53,12 +47,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy compiled binary from builder
-COPY --from=builder /app/target/release/nutrition-fact-labeller /usr/local/bin/nutrition-fact-labeller
+COPY --from=builder /usr/local/cargo/bin/nutrition-fact-labeller /usr/local/bin/nutrition-fact-labeller
 COPY --from=downloader /paddleocr-models /app/paddleocr-models
 
 # Run as non-root user (optional best practice)
-RUN useradd -m appuser
-USER appuser
+# RUN useradd -m appuser
+# RUN chown -R appuser:appuser /app
+# USER appuser
 
 # Entrypoint
 ENTRYPOINT ["nutrition-fact-labeller"]

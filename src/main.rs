@@ -3,7 +3,6 @@ use log::{info, debug};
 use std::collections::HashMap;
 use serde_derive::{Deserialize, Serialize};
 use oar_ocr::prelude::*;
-use std::path::Path;
 use warp::Filter;
 use warp::multipart::FormData;
 use futures_util::TryStreamExt;
@@ -58,11 +57,11 @@ fn run_ocr_rgb(image: image::RgbImage) -> Result<Vec<MyTextRegion>, String> {
     )
     // Configure document orientation with confidence threshold
     .doc_orientation_classify_model_path("paddleocr-models/pplcnet_x1_0_doc_ori.onnx")
-    .doc_orientation_confidence_threshold(0.8) // Only accept predictions with 80% confidence
+    .doc_orientation_threshold(0.8) // Only accept predictions with 80% confidence
     .use_doc_orientation_classify(true)
     // Configure text line orientation with confidence threshold
     .textline_orientation_classify_model_path("paddleocr-models/pplcnet_x1_0_textline_ori.onnx")
-    .textline_orientation_confidence_threshold(0.7) // Only accept predictions with 70% confidence
+    .textline_orientation_threshold(0.7) // Only accept predictions with 70% confidence
     .use_textline_orientation(true)
     // configure document rectification
     .doc_unwarping_model_path("paddleocr-models/uvdoc.onnx")
