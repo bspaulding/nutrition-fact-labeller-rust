@@ -1,7 +1,7 @@
 # =========================
 # 0. Builder stage
 # =========================
-FROM public.ecr.aws/docker/library/rust:1.89-bookworm as builder
+FROM public.ecr.aws/docker/library/rust:1.91-bookworm as builder
 
 # Create a new empty shell project
 WORKDIR /app
@@ -23,6 +23,11 @@ RUN cargo install --path .
 # 1. Model Download stage
 # =========================
 FROM public.ecr.aws/docker/library/debian:bookworm-slim AS downloader
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /paddleocr-models
 
