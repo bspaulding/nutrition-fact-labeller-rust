@@ -124,9 +124,18 @@ async fn main() {
 
     let port: u16 = std::env::var("PORT").ok().and_then(|p| p.parse::<u16>().ok()).unwrap_or(3030);
     info!("running and listening on {port}");
-    warp::serve(upload)
-        .run(([0, 0, 0, 0], port))
-        .await;
+
+    let server = warp::serve(upload)
+        .bind(([0, 0, 0, 0], port))
+        .await
+        .run();
+
+    tokio::select! {
+        _ = server => {},
+        _ = tokio::signal::ctrl_c() => {
+            println!("Shutting down...");
+        },
+    }
 }
 
 pub fn timeit<T, F>(label: &str, f: F) -> T
