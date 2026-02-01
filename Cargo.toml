@@ -13,11 +13,10 @@ log = "0.4.28"
 burn = { version = "0.20.1", features = ["ndarray"] }
 burn-ndarray = "0.20.1"
 burn-import = { version = "0.20.1", features = ["onnx"] }
+burn-store = { version = "0.20.1", features = ["std"] }
 # Pin to exact candle-core version that burn-import expects (workaround for compatibility issue)
 candle-core = "=0.9.1"
-# Keeping oar-ocr temporarily for comparison and full functionality
-# The Burn models are generated and ready, but full OCR pipeline implementation is pending
-oar-ocr = { version = "0.2.2" }
+# oar-ocr has been replaced with Burn-based implementation
 pretty_assertions = "1.4.1"
 regex = "1.11.2"
 serde = { version = "1.0.219", features = ["serde_derive"] }
