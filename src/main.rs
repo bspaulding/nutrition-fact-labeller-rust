@@ -9,7 +9,13 @@ use futures_util::TryStreamExt;
 use bytes::BufMut;
 use oar_ocr::utils::image::dynamic_to_rgb;
 use oar_ocr::core::config::onnx::{OrtSessionConfig, OrtExecutionProvider, OrtGraphOptimizationLevel};
+
 mod spellcheck;
+
+// Burn models - generated at compile-time from ONNX files
+// These demonstrate the successful workaround for burn-import compatibility
+#[allow(dead_code)]
+mod burn_models;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MyTextRegion {

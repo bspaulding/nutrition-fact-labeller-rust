@@ -4,18 +4,33 @@
 
 This document outlines the work required to convert this project from using ONNX Runtime (via `oar-ocr`) to the Burn deep learning framework.
 
-## Current Status: BLOCKED
+## Current Status: UNBLOCKED ✅
 
-**Critical Blocker**: The `burn-import` crate (v0.20.1) does not currently compile due to incompatibilities with `candle-core` v0.9.2. The burn-import crate has not been updated to handle newer DType variants added to candle-core.
+**Solution Found**: Pinning `candle-core` to version `=0.9.1` successfully resolves the compilation issues with `burn-import` v0.20.1.
 
-### Compilation Error
+### Working Configuration
+```toml
+[dependencies]
+burn = { version = "0.20.1", features = ["ndarray"] }
+burn-ndarray = "0.20.1"
+burn-import = { version = "0.20.1", features = ["onnx"] }
+candle-core = "=0.9.1"  # Exact version pin is critical
+
+[build-dependencies]
+burn-import = { version = "0.20.1", features = ["onnx"] }
+candle-core = "=0.9.1"  # Must pin in both sections
 ```
-error[E0004]: non-exhaustive patterns: `candle_core::DType::I16`, `candle_core::DType::I32`, 
-`candle_core::DType::F8E4M3` and 4 more not covered
-  --> burn-import-0.20.1/src/common/candle.rs:62:15
-```
 
-This is an upstream issue in the Burn ecosystem that needs to be resolved before this conversion can proceed.
+### What Works Now
+✅ `burn-import` compiles successfully with `candle-core` v0.9.1  
+✅ ONNX models convert to Burn at compile-time  
+✅ Generated Rust code for both detection and recognition models  
+✅ Models include weights in `.bpk` (BurnPack) format  
+✅ Type-safe inference API generated
+
+### Generated Artifacts
+- `ppocrv4_mobile_det.rs` (117 KB) + `ppocrv4_mobile_det.bpk` (4.6 MB)
+- `en_ppocrv4_mobile_rec.rs` (113 KB) + `en_ppocrv4_mobile_rec.bpk` (7.3 MB)
 
 ## Background
 
@@ -37,63 +52,30 @@ This is an upstream issue in the Burn ecosystem that needs to be resolved before
 
 ## Conversion Approaches
 
-### Approach 1: Using burn-import (BLOCKED)
+### Approach 1: Using burn-import (NOW WORKING)
 
-This is the most straightforward approach but is currently blocked:
+This is the most straightforward approach and is now unblocked:
 
-1. Use `burn-import` to convert ONNX models to Burn at compile-time
-2. Generated Rust code can run on any Burn backend
-3. Replace `oar-ocr` inference calls with Burn inference
+1. ✅ Use `burn-import` to convert ONNX models to Burn at compile-time
+2. ✅ Generated Rust code can run on any Burn backend
+3. 🔄 Replace `oar-ocr` inference calls with Burn inference (in progress)
 
-**Status**: Cannot proceed due to burn-import compilation issues
+**Status**: Models successfully converted, inference pipeline implementation needed
 
-**Prerequisites**:
-- burn-import must be fixed to work with latest candle-core
-- OR use older, compatible versions (requires significant dependency downgrades)
+**Remaining Work**:
+- Implement text detection pre/post-processing
+- Implement text recognition pre/post-processing  
+- Integrate with existing application code
 
-### Approach 2: Manual Implementation (LARGE EFFORT)
+### Approach 2: Manual Implementation (NO LONGER NEEDED)
 
-Implement OCR pipeline from scratch using Burn's low-level APIs:
+This approach is no longer necessary since burn-import works with the version pin.
 
-**Required Components**:
+### Approach 3: Hybrid Approach (CURRENT STATE)
 
-1. **Model Loading** (~200 LOC)
-   - Load ONNX weights manually
-   - Convert to Burn tensor format
-   - Handle different data types and shapes
-
-2. **Text Detection** (~500 LOC)
-   - Image preprocessing (normalization, resizing)
-   - DBNet model inference
-   - Post-processing (binarization, contour detection)
-   - Non-Maximum Suppression (NMS)
-   - Polygon to bounding box conversion
-
-3. **Text Recognition** (~400 LOC)
-   - Text region extraction and normalization
-   - CRNN model inference
-   - CTC decoding
-   - Character dictionary lookup
-
-4. **Optional Models** (~300 LOC each)
-   - Document orientation classification
-   - Text line orientation
-   - Document unwarping
-
-**Estimated Total**: 2000+ lines of code, 2-4 weeks of development
-
-**Challenges**:
-- Understanding PaddleOCR model architectures
-- Implementing complex post-processing algorithms
-- Testing and debugging inference pipeline
-- Performance optimization
-
-### Approach 3: Hybrid Approach
-
-Keep ONNX Runtime but use Burn for other parts:
-- Use Burn for custom layers or preprocessing
-- Keep ONNX Runtime for model inference
-- Less disruption, incremental migration
+Current implementation demonstrates both:
+- Burn models successfully compile and are available
+- oar-ocr continues to work for functionality during migration
 
 ## Technical Details
 
@@ -102,43 +84,51 @@ Keep ONNX Runtime but use Burn for other parts:
    - Text detection model
    - Input: RGB image, variable size
    - Output: Probability map
+   - ✅ Successfully converted to Burn
 
 2. **en_ppocrv4_mobile_rec.onnx** (7.5 MB)
    - Text recognition model
    - Input: Normalized text region
    - Output: Character probabilities
+   - ✅ Successfully converted to Burn
 
 3. **pplcnet_x1_0_doc_ori.onnx**
    - Document orientation (0°, 90°, 180°, 270°)
+   - 🔄 Conversion pending
 
 4. **pplcnet_x1_0_textline_ori.onnx**
    - Text line orientation (0° or 180°)
+   - 🔄 Conversion pending
 
 5. **uvdoc.onnx**
    - Document unwarping/rectification
+   - 🔄 Conversion pending
 
 ### Burn Backend Options
-- **NdArray**: CPU-only, no external dependencies
+- **NdArray**: CPU-only, no external dependencies (currently configured)
 - **WGPU**: GPU acceleration via WebGPU
 - **CUDA**: NVIDIA GPU acceleration
 - **LibTorch**: PyTorch backend (requires LibTorch C++ library)
 - **Candle**: HuggingFace's Candle backend
 
-## Roadmap When Unblocked
+## Roadmap
 
-### Phase 1: Environment Setup
-- [ ] Wait for burn-import fix OR identify working version combination
-- [ ] Set up build system for ONNX to Burn conversion
-- [ ] Verify model conversion works correctly
+### Phase 1: Environment Setup ✅
+- [x] Identify working burn-import version combination
+- [x] Set up build system for ONNX to Burn conversion
+- [x] Verify model conversion works correctly
+- [x] Generate Burn models at compile-time
 
-### Phase 2: Core Implementation
-- [ ] Implement text detection pipeline
-- [ ] Implement text recognition pipeline
+### Phase 2: Core Implementation (In Progress)
+- [ ] Implement text detection pre-processing
+- [ ] Implement text detection post-processing (binarization, contours, NMS)
+- [ ] Implement text recognition pre-processing
+- [ ] Implement text recognition post-processing (CTC decode)
 - [ ] Test with sample images
 
 ### Phase 3: Optional Features
-- [ ] Add orientation detection
-- [ ] Add document unwarping
+- [ ] Add orientation detection models
+- [ ] Add document unwarping model
 - [ ] Optimize performance
 
 ### Phase 4: Integration
@@ -147,27 +137,30 @@ Keep ONNX Runtime but use Burn for other parts:
 - [ ] Update Docker container
 - [ ] Performance benchmarking
 
-## Dependencies When Unblocked
+## Implementation Estimate
+
+With burn-import working:
+- **Text Detection Pipeline**: ~2-3 days
+- **Text Recognition Pipeline**: ~2-3 days
+- **Integration & Testing**: ~1-2 days
+- **Total**: ~1 week of focused development
+
+## Key Learnings
+
+### The Version Pin Solution
+The issue was that `burn-import` v0.20.1 was built against `candle-core` v0.9.1, but Cargo was resolving to v0.9.2 which added new `DType` variants that burn-import didn't handle. The solution:
 
 ```toml
-[dependencies]
-burn = { version = "0.20", features = ["ndarray"] }
-burn-ndarray = "0.20"
-
-[build-dependencies]
-burn-import = { version = "0.20", features = ["onnx"] }
+candle-core = "=0.9.1"  # Exact version pin with "="
 ```
 
-## Alternative: Wait for burn-onnx Repository
+This must be specified in **both** `[dependencies]` and `[build-dependencies]` sections.
 
-The Burn team maintains a separate `burn-onnx` repository (https://github.com/tracel-ai/burn-onnx) that may have more recent fixes. However, as of the time of this writing, the published `burn-import` crate on crates.io still has the compilation issues.
-
-## Recommendations
-
-1. **Short-term**: Keep using `oar-ocr` until burn-import is fixed
-2. **Medium-term**: Monitor burn-import releases for fixes
-3. **Long-term**: Consider contributing a fix to burn-import
-4. **Alternative**: Implement manual ONNX weight loading if burn-import remains broken
+### Why It Works
+- Burn workspace specifies `candle-core = { version = "0.9.1" }`
+- Without explicit pin, Cargo resolves to latest compatible (0.9.2)
+- With `=0.9.1` pin, Cargo uses exact version across all dependencies
+- burn-import code matches the DType enum from 0.9.1
 
 ## Resources
 
@@ -179,14 +172,17 @@ The Burn team maintains a separate `burn-onnx` repository (https://github.com/tr
 
 ## Contributing
 
-If you want to help unblock this conversion:
+To continue the conversion:
 
-1. Check burn-import repository for existing issues
-2. Test with different version combinations
-3. Consider contributing a fix to burn-import
-4. OR help implement manual ONNX loading for Burn
+1. Implement detection pre-processing (image normalization, resizing)
+2. Implement detection post-processing (threshold, contours, NMS)
+3. Implement recognition pre-processing (text region extraction)
+4. Implement recognition post-processing (CTC decode, character mapping)
+5. Test inference with sample images
+6. Replace oar-ocr usage in main application
 
 ---
 
-Last Updated: 2026-02-01
-Status: Blocked by upstream burn-import compilation issues
+Last Updated: 2026-02-01  
+Status: Unblocked - Models converted successfully with candle-core v0.9.1 pin
+
