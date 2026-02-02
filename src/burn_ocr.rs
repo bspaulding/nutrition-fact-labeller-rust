@@ -45,12 +45,19 @@ fn preprocess_image_for_detection(img: &RgbImage) -> Tensor<B, 4> {
         }
     }
     
-    // Convert ndarray to Burn tensor - use from_floats with reshape
+    // Convert ndarray to Burn tensor properly
+    // The key is to create TensorData with the correct shape from the start
     let device = Default::default();
-    let data_vec = arr.into_raw_vec();
     
-    Tensor::<B, 1>::from_floats(data_vec.as_slice(), &device)
-        .reshape([1, 3, target_size as usize, target_size as usize])
+    // Convert the ndarray to a vec and create TensorData with explicit shape
+    let data_vec = arr.into_raw_vec_and_offset().0;
+    let shape_vec = vec![1, 3, target_size as usize, target_size as usize];
+    
+    // Create tensor using from_data which accepts anything that implements Into<TensorData>
+    // We can create a Data struct that holds the vec and shape
+    let tensor_data = burn::tensor::TensorData::new(data_vec, shape_vec);
+    
+    Tensor::<B, 4>::from_data(tensor_data.convert::<f32>(), &device)
 }
 
 /// Post-process detection model output to extract text regions
@@ -180,12 +187,17 @@ fn preprocess_region_for_recognition(
         }
     }
     
-    // Convert ndarray to Burn tensor - use from_floats with reshape
+    // Convert ndarray to Burn tensor properly
     let device = Default::default();
-    let data_vec = arr.into_raw_vec();
     
-    Tensor::<B, 1>::from_floats(data_vec.as_slice(), &device)
-        .reshape([1, 1, target_height as usize, target_width as usize])
+    // Convert the ndarray to a vec and create TensorData with explicit shape
+    let data_vec = arr.into_raw_vec_and_offset().0;
+    let shape_vec = vec![1, 1, target_height as usize, target_width as usize];
+    
+    // Create tensor using from_data which accepts anything that implements Into<TensorData>
+    let tensor_data = burn::tensor::TensorData::new(data_vec, shape_vec);
+    
+    Tensor::<B, 4>::from_data(tensor_data.convert::<f32>(), &device)
 }
 
 /// Post-process recognition model output to extract text using CTC decoding
