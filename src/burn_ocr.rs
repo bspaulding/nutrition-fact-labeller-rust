@@ -43,7 +43,7 @@ fn preprocess_image_for_detection(img: &RgbImage) -> Tensor<B, 4> {
     }
     
     // Create tensor from data
-    Tensor::<B, 4>::from_floats(data.as_slice(), &Default::default())
+    Tensor::<B, 1>::from_floats(data.as_slice(), &Default::default())
         .reshape([1, 3, target_size as usize, target_size as usize])
 }
 
@@ -101,7 +101,7 @@ fn preprocess_region_for_recognition(
     }
     
     // Create tensor with shape [1, 1, H, W] for grayscale input
-    Tensor::<B, 4>::from_floats(data.as_slice(), &Default::default())
+    Tensor::<B, 1>::from_floats(data.as_slice(), &Default::default())
         .reshape([1, 1, target_height as usize, target_width as usize])
 }
 
