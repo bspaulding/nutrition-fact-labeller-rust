@@ -49,18 +49,80 @@ fn preprocess_image_for_detection(img: &RgbImage) -> Tensor<B, 4> {
 
 /// Post-process detection model output to extract text regions
 /// The detection model outputs a probability map that needs to be thresholded and contoured
-fn postprocess_detection(_output: Tensor<B, 4>) -> Vec<(u32, u32, u32, u32)> {
+fn postprocess_detection(output: Tensor<B, 4>) -> Vec<(u32, u32, u32, u32)> {
     debug!("Post-processing detection output");
     
-    // For now, return a placeholder
-    // In a full implementation, this would:
-    // 1. Threshold the probability map
-    // 2. Find contours
-    // 3. Apply NMS (Non-Maximum Suppression)
-    // 4. Return bounding boxes as (x, y, width, height)
+    // Get the output shape: [batch, channels, height, width]
+    let output_data = output.to_data();
+    let shape = output_data.shape.clone();
     
-    // Placeholder: return one region covering most of the image
-    vec![(50, 50, 860, 860)]
+    if shape[0] != 1 {
+        debug!("Warning: Expected batch size 1, got {}", shape[0]);
+        return vec![];
+    }
+    
+    let height = shape[2];
+    let width = shape[3];
+    
+    // Convert tensor data to vector
+    let values: Vec<f32> = output_data.as_slice::<f32>()
+        .map(|s| s.to_vec())
+        .unwrap_or_default();
+    
+    if values.is_empty() {
+        debug!("Warning: Empty detection output");
+        return vec![];
+    }
+    
+    // Simple thresholding approach
+    // In a full implementation, this would:
+    // 1. Apply threshold to create binary map
+    // 2. Find connected components / contours
+    // 3. Filter by size and aspect ratio
+    // 4. Apply Non-Maximum Suppression (NMS)
+    
+    // For now, use a simple sliding window approach to find high-probability regions
+    let threshold = 0.5;
+    let mut regions = Vec::new();
+    
+    // Scan the probability map for regions above threshold
+    let window_size = 32;
+    let stride = 16;
+    
+    for y in (0..height).step_by(stride) {
+        for x in (0..width).step_by(stride) {
+            let mut sum = 0.0;
+            let mut count = 0;
+            
+            for dy in 0..window_size.min(height - y) {
+                for dx in 0..window_size.min(width - x) {
+                    let idx = (y + dy) * width + (x + dx);
+                    if idx < values.len() {
+                        sum += values[idx];
+                        count += 1;
+                    }
+                }
+            }
+            
+            let avg = if count > 0 { sum / count as f32 } else { 0.0 };
+            
+            if avg > threshold {
+                let w = window_size.min(width - x) as u32;
+                let h = window_size.min(height - y) as u32;
+                regions.push((x as u32, y as u32, w, h));
+            }
+        }
+    }
+    
+    // Merge overlapping regions (simple approach)
+    if regions.is_empty() {
+        // Fallback: return one region covering most of the image
+        debug!("No regions detected, using fallback region");
+        vec![(50, 50, width as u32 - 100, height as u32 - 100)]
+    } else {
+        debug!("Detected {} regions", regions.len());
+        regions
+    }
 }
 
 /// Preprocess a text region for the recognition model
@@ -105,18 +167,92 @@ fn preprocess_region_for_recognition(
         .reshape([1, 1, target_height as usize, target_width as usize])
 }
 
-/// Post-process recognition model output to extract text
-fn postprocess_recognition(_output: Tensor<B, 3>, _dictionary: &[String]) -> (String, f32) {
-    debug!("Post-processing recognition output");
+/// Post-process recognition model output to extract text using CTC decoding
+/// The recognition model outputs character probabilities for each time step
+fn postprocess_recognition(output: Tensor<B, 3>, dictionary: &[String]) -> (String, f32) {
+    debug!("Post-processing recognition output with CTC decoding");
     
-    // For now, return a placeholder
-    // In a full implementation, this would:
-    // 1. Apply CTC decoding
-    // 2. Map indices to characters using the dictionary
-    // 3. Calculate confidence scores
+    // Get the output shape: [batch, time_steps, num_classes]
+    let output_data = output.to_data();
+    let shape = output_data.shape.clone();
     
-    // Placeholder
-    ("sample_text".to_string(), 0.95)
+    // For batch size of 1, we extract [time_steps, num_classes]
+    if shape[0] != 1 {
+        debug!("Warning: Expected batch size 1, got {}", shape[0]);
+        return (String::new(), 0.0);
+    }
+    
+    let time_steps = shape[1];
+    let num_classes = shape[2];
+    
+    // Convert tensor data to vector
+    let values: Vec<f32> = output_data.as_slice::<f32>()
+        .map(|s| s.to_vec())
+        .unwrap_or_default();
+    
+    if values.is_empty() {
+        debug!("Warning: Empty output tensor");
+        return (String::new(), 0.0);
+    }
+    
+    // CTC greedy decoding: take argmax at each time step
+    let mut decoded_indices = Vec::new();
+    let mut confidences = Vec::new();
+    
+    for t in 0..time_steps {
+        let offset = t * num_classes;
+        let mut max_idx = 0;
+        let mut max_val = values[offset];
+        
+        for c in 1..num_classes {
+            let val = values[offset + c];
+            if val > max_val {
+                max_val = val;
+                max_idx = c;
+            }
+        }
+        
+        decoded_indices.push(max_idx);
+        confidences.push(max_val);
+    }
+    
+    // CTC decoding: remove blanks and consecutive duplicates
+    // Typically, index 0 is the CTC blank token
+    let blank_idx = 0;
+    let mut result = String::new();
+    let mut prev_idx = blank_idx;
+    
+    for &idx in &decoded_indices {
+        if idx != blank_idx && idx != prev_idx {
+            // Map index to character using dictionary
+            // Account for blank token at index 0
+            if idx > 0 && (idx - 1) < dictionary.len() {
+                result.push_str(&dictionary[idx - 1]);
+            }
+        }
+        prev_idx = idx;
+    }
+    
+    // Calculate average confidence (excluding blank)
+    let non_blank_confidences: Vec<f32> = decoded_indices.iter()
+        .zip(confidences.iter())
+        .filter_map(|(idx, conf)| {
+            if *idx != blank_idx {
+                Some(*conf)
+            } else {
+                None
+            }
+        })
+        .collect();
+    
+    let avg_confidence = if non_blank_confidences.is_empty() {
+        0.0
+    } else {
+        non_blank_confidences.iter().sum::<f32>() / non_blank_confidences.len() as f32
+    };
+    
+    debug!("Decoded text: '{}' with confidence: {:.2}", result, avg_confidence);
+    (result, avg_confidence)
 }
 
 /// Load the character dictionary
