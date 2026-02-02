@@ -1,12 +1,15 @@
 use burn::tensor::{Tensor, TensorData};
-use burn_candle::Candle;
+use burn::backend::ndarray::NdArray;
 use image::RgbImage;
 use log::debug;
 
 use crate::MyTextRegion;
 
-// Type alias for the backend we're using - Candle for better performance
-type B = Candle<f32>;
+// Type alias for the backend we're using - NdArray for complete operation support
+// Note: Candle backend doesn't support adaptive_avg_pool2d used in these ONNX models
+// Note: LibTorch backend requires external libtorch C++ library
+// NdArray is slower but has full operation coverage and no external dependencies
+type B = NdArray<f32>;
 
 /// Preprocess an RGB image for the detection model
 /// The detection model expects input shape [1, 3, H, W] with values normalized to [0, 1]
