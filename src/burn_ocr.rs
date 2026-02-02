@@ -3,6 +3,7 @@ use burn::prelude::*;
 use burn_ndarray::NdArray;
 use image::RgbImage;
 use log::debug;
+use ndarray::{Array, IxDyn};
 
 use crate::MyTextRegion;
 
@@ -25,29 +26,31 @@ fn preprocess_image_for_detection(img: &RgbImage) -> Tensor<B, 4> {
         image::imageops::FilterType::Lanczos3,
     );
     
-    // Create data in NCHW format: [batch, channel, height, width]
-    let mut data = Vec::with_capacity((1 * 3 * target_size * target_size) as usize);
+    // Create ndarray directly with shape [1, 3, H, W]
+    let shape = IxDyn(&[1, 3, target_size as usize, target_size as usize]);
+    let mut arr = Array::zeros(shape);
     
-    for channel in 0..3 {
+    // Fill in the data in NCHW format
+    for c in 0..3 {
         for y in 0..target_size {
             for x in 0..target_size {
                 let pixel = img_resized.get_pixel(x, y);
-                let value = match channel {
+                let value = match c {
                     0 => pixel[0] as f32 / 255.0,
                     1 => pixel[1] as f32 / 255.0,
                     _ => pixel[2] as f32 / 255.0,
                 };
-                data.push(value);
+                arr[[0, c, y as usize, x as usize]] = value;
             }
         }
     }
     
-    // Create tensor directly using from_floats with the right backend
+    // Convert ndarray to Burn tensor - use from_floats with reshape
     let device = Default::default();
-    let flat_tensor = Tensor::<B, 1>::from_floats(data.as_slice(), &device);
+    let data_vec = arr.into_raw_vec();
     
-    // Reshape to [1, 3, H, W]
-    flat_tensor.reshape([1, 3, target_size as usize, target_size as usize])
+    Tensor::<B, 1>::from_floats(data_vec.as_slice(), &device)
+        .reshape([1, 3, target_size as usize, target_size as usize])
 }
 
 /// Post-process detection model output to extract text regions
@@ -165,12 +168,24 @@ fn preprocess_region_for_recognition(
         }
     }
     
-    // Create tensor directly using from_floats with the right backend
-    let device = Default::default();
-    let flat_tensor = Tensor::<B, 1>::from_floats(data.as_slice(), &device);
+    // Create ndarray directly with shape [1, 1, H, W]
+    let shape = IxDyn(&[1, 1, target_height as usize, target_width as usize]);
+    let mut arr = Array::zeros(shape);
     
-    // Reshape to [1, 1, H, W]
-    flat_tensor.reshape([1, 1, target_height as usize, target_width as usize])
+    // Fill in the grayscale data
+    for y in 0..target_height {
+        for x in 0..target_width {
+            let idx = (y * target_width + x) as usize;
+            arr[[0, 0, y as usize, x as usize]] = data[idx];
+        }
+    }
+    
+    // Convert ndarray to Burn tensor - use from_floats with reshape
+    let device = Default::default();
+    let data_vec = arr.into_raw_vec();
+    
+    Tensor::<B, 1>::from_floats(data_vec.as_slice(), &device)
+        .reshape([1, 1, target_height as usize, target_width as usize])
 }
 
 /// Post-process recognition model output to extract text using CTC decoding

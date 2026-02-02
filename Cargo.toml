@@ -14,6 +14,7 @@ burn = { version = "0.20.1", features = ["ndarray"] }
 burn-ndarray = "0.20.1"
 burn-import = { version = "0.20.1", features = ["onnx"] }
 burn-store = { version = "0.20.1", features = ["std"] }
+ndarray = "0.17.2"
 # Pin to exact candle-core version that burn-import expects (workaround for compatibility issue)
 candle-core = "=0.9.1"
 # oar-ocr has been replaced with Burn-based implementation

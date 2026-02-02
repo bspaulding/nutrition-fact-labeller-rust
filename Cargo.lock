@@ -4281,6 +4281,7 @@ dependencies = [
  "futures-util",
  "image",
  "log",
+ "ndarray 0.17.2",
  "pretty_assertions",
  "regex",
  "serde",
