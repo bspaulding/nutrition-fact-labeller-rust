@@ -54,11 +54,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-build-target-
       
-      # Use release build for tests - provides significant performance improvement
-      # for CPU-intensive operations like CNN inference
-      - name: Run cargo test (release mode)
-        run: cargo test --release --verbose
+      - name: Run cargo test
+        run: cargo test --verbose
         env:
           # Increase test timeout to 10 minutes for slow Burn NdArray backend
           RUST_TEST_THREADS: 1
-          RUST_TEST_TIME_UNIT: 600000
+          RUST_TEST_TIME_UNIT: 60000
