@@ -1,5 +1,4 @@
 use burn::tensor::Tensor;
-use burn::prelude::*;
 use burn_ndarray::NdArray;
 use image::RgbImage;
 use log::debug;
