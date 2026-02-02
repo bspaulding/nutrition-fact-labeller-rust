@@ -1,4 +1,5 @@
 use burn::tensor::Tensor;
+use burn::prelude::*;
 use burn_ndarray::NdArray;
 use image::RgbImage;
 use log::debug;
@@ -24,10 +25,9 @@ fn preprocess_image_for_detection(img: &RgbImage) -> Tensor<B, 4> {
         image::imageops::FilterType::Lanczos3,
     );
     
-    // Convert image to tensor with shape [1, 3, H, W]
-    let mut data = Vec::with_capacity((3 * target_size * target_size) as usize);
+    // Create data in NCHW format: [batch, channel, height, width]
+    let mut data = Vec::with_capacity((1 * 3 * target_size * target_size) as usize);
     
-    // Separate RGB channels and normalize to [0, 1]
     for channel in 0..3 {
         for y in 0..target_size {
             for x in 0..target_size {
@@ -42,9 +42,12 @@ fn preprocess_image_for_detection(img: &RgbImage) -> Tensor<B, 4> {
         }
     }
     
-    // Create tensor from data
-    Tensor::<B, 1>::from_floats(data.as_slice(), &Default::default())
-        .reshape([1, 3, target_size as usize, target_size as usize])
+    // Create tensor directly using from_floats with the right backend
+    let device = Default::default();
+    let flat_tensor = Tensor::<B, 1>::from_floats(data.as_slice(), &device);
+    
+    // Reshape to [1, 3, H, W]
+    flat_tensor.reshape([1, 3, target_size as usize, target_size as usize])
 }
 
 /// Post-process detection model output to extract text regions
@@ -162,9 +165,12 @@ fn preprocess_region_for_recognition(
         }
     }
     
-    // Create tensor with shape [1, 1, H, W] for grayscale input
-    Tensor::<B, 1>::from_floats(data.as_slice(), &Default::default())
-        .reshape([1, 1, target_height as usize, target_width as usize])
+    // Create tensor directly using from_floats with the right backend
+    let device = Default::default();
+    let flat_tensor = Tensor::<B, 1>::from_floats(data.as_slice(), &device);
+    
+    // Reshape to [1, 1, H, W]
+    flat_tensor.reshape([1, 1, target_height as usize, target_width as usize])
 }
 
 /// Post-process recognition model output to extract text using CTC decoding
@@ -271,39 +277,45 @@ pub fn run_ocr_burn(image: RgbImage) -> Result<Vec<MyTextRegion>, String> {
     // Load dictionary
     let dictionary = load_dictionary()?;
     
-    // TODO: Load the actual Burn models
-    // For now, this is a placeholder implementation that demonstrates the structure
-    // The actual implementation would:
-    // 1. Load detection model: crate::burn_models::ppocrv4_mobile_det::Model
-    // 2. Load recognition model: crate::burn_models::en_ppocrv4_mobile_rec::Model
+    // Load the actual Burn models
+    debug!("Loading detection model...");
+    let detection_model = crate::burn_models::ppocrv4_mobile_det::Model::<B>::default();
+    
+    debug!("Loading recognition model...");
+    let recognition_model = crate::burn_models::en_ppocrv4_mobile_rec::Model::<B>::default();
     
     // Step 1: Preprocess image for detection
-    let _detection_input = preprocess_image_for_detection(&image);
+    debug!("Preprocessing image for detection...");
+    let detection_input = preprocess_image_for_detection(&image);
     
     // Step 2: Run detection model
-    // let detection_output = detection_model.forward(detection_input);
-    // For now, use placeholder
-    let detection_output = Tensor::<B, 4>::zeros([1, 1, 960, 960], &Default::default());
+    debug!("Running detection model...");
+    let detection_output = detection_model.forward(detection_input);
     
     // Step 3: Post-process detection to get text regions
+    debug!("Post-processing detection output...");
     let bboxes = postprocess_detection(detection_output);
     
     // Step 4: For each detected region, run recognition
     let mut results = Vec::new();
     
-    for bbox in bboxes {
+    for (idx, bbox) in bboxes.iter().enumerate() {
+        debug!("Processing region {}: {:?}", idx, bbox);
+        
         // Preprocess region for recognition
-        let _recognition_input = preprocess_region_for_recognition(&image, bbox);
+        let recognition_input = preprocess_region_for_recognition(&image, *bbox);
         
         // Run recognition model
-        // let recognition_output = recognition_model.forward(recognition_input);
-        // For now, use placeholder
-        let recognition_output = Tensor::<B, 3>::zeros([1, 26, 37], &Default::default());
+        debug!("Running recognition model for region {}...", idx);
+        let recognition_output = recognition_model.forward(recognition_input);
         
         // Post-process recognition
         let (text, confidence) = postprocess_recognition(recognition_output, &dictionary);
         
-        results.push(MyTextRegion { text, confidence });
+        if !text.is_empty() {
+            debug!("Detected text: '{}' with confidence: {:.2}", text, confidence);
+            results.push(MyTextRegion { text, confidence });
+        }
     }
     
     debug!("Burn OCR completed with {} regions", results.len());
