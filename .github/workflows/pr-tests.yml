@@ -7,6 +7,11 @@ on:
 
 jobs:
   test:
+    # Options for faster runners (requires paid GitHub plan):
+    # - ubuntu-latest-4-core (4 CPU cores, 16 GB RAM) 
+    # - ubuntu-latest-8-core (8 CPU cores, 32 GB RAM)
+    # - ubuntu-latest-16-core (16 CPU cores, 64 GB RAM)
+    # Note: GitHub does not provide GPU runners. For GPU support, use self-hosted runners.
     runs-on: ubuntu-latest
     
     steps:
@@ -49,5 +54,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-build-target-
       
-      - name: Run cargo test
-        run: cargo test --verbose
+      # Use release build for tests - provides significant performance improvement
+      # for CPU-intensive operations like CNN inference
+      - name: Run cargo test (release mode)
+        run: cargo test --release --verbose
+        env:
+          # Increase test timeout to 10 minutes for slow Burn NdArray backend
+          RUST_TEST_THREADS: 1
+          RUST_TEST_TIME_UNIT: 600000
