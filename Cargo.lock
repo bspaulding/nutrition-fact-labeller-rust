@@ -4272,7 +4272,6 @@ version = "0.1.0"
 dependencies = [
  "burn",
  "burn-import",
- "burn-ndarray",
  "burn-store",
  "bytes",
  "candle-core",
