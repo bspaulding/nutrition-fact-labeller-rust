@@ -1,13 +1,12 @@
-use burn::tensor::Tensor;
-use burn_ndarray::NdArray;
+use burn::tensor::{Tensor, TensorData};
+use burn_candle::Candle;
 use image::RgbImage;
 use log::debug;
-use ndarray::{Array, IxDyn};
 
 use crate::MyTextRegion;
 
-// Type alias for the backend we're using
-type B = NdArray<f32>;
+// Type alias for the backend we're using - Candle for better performance
+type B = Candle<f32>;
 
 /// Preprocess an RGB image for the detection model
 /// The detection model expects input shape [1, 3, H, W] with values normalized to [0, 1]
@@ -25,11 +24,10 @@ fn preprocess_image_for_detection(img: &RgbImage) -> Tensor<B, 4> {
         image::imageops::FilterType::Lanczos3,
     );
     
-    // Create ndarray directly with shape [1, 3, H, W]
-    let shape = IxDyn(&[1, 3, target_size as usize, target_size as usize]);
-    let mut arr = Array::zeros(shape);
+    // Create data in NCHW format [batch, channels, height, width]
+    let mut data_vec = Vec::with_capacity(1 * 3 * target_size as usize * target_size as usize);
     
-    // Fill in the data in NCHW format
+    // Fill in the data in NCHW format (all of channel 0, then all of channel 1, then channel 2)
     for c in 0..3 {
         for y in 0..target_size {
             for x in 0..target_size {
@@ -39,22 +37,18 @@ fn preprocess_image_for_detection(img: &RgbImage) -> Tensor<B, 4> {
                     1 => pixel[1] as f32 / 255.0,
                     _ => pixel[2] as f32 / 255.0,
                 };
-                arr[[0, c, y as usize, x as usize]] = value;
+                data_vec.push(value);
             }
         }
     }
     
-    // Convert ndarray to Burn tensor properly
-    // The key is to create TensorData with the correct shape from the start
+    // Convert to Burn tensor with explicit shape specification
+    // This ensures proper NCHW layout interpretation
     let device = Default::default();
     
-    // Convert the ndarray to a vec and create TensorData with explicit shape
-    let data_vec = arr.into_raw_vec_and_offset().0;
+    // Create TensorData with explicit shape specification
     let shape_vec = vec![1, 3, target_size as usize, target_size as usize];
-    
-    // Create tensor using from_data which accepts anything that implements Into<TensorData>
-    // We can create a Data struct that holds the vec and shape
-    let tensor_data = burn::tensor::TensorData::new(data_vec, shape_vec);
+    let tensor_data = TensorData::new(data_vec, shape_vec);
     
     Tensor::<B, 4>::from_data(tensor_data.convert::<f32>(), &device)
 }
@@ -161,7 +155,7 @@ fn preprocess_region_for_recognition(
         image::imageops::FilterType::Lanczos3,
     );
     
-    // Convert to grayscale and normalize
+    // Convert to grayscale and normalize to [-1, 1]
     let mut data = Vec::with_capacity((target_height * target_width) as usize);
     
     for y in 0..target_height {
@@ -174,27 +168,10 @@ fn preprocess_region_for_recognition(
         }
     }
     
-    // Create ndarray directly with shape [1, 1, H, W]
-    let shape = IxDyn(&[1, 1, target_height as usize, target_width as usize]);
-    let mut arr = Array::zeros(shape);
-    
-    // Fill in the grayscale data
-    for y in 0..target_height {
-        for x in 0..target_width {
-            let idx = (y * target_width + x) as usize;
-            arr[[0, 0, y as usize, x as usize]] = data[idx];
-        }
-    }
-    
-    // Convert ndarray to Burn tensor properly
+    // Create TensorData with shape [1, 1, H, W]
     let device = Default::default();
-    
-    // Convert the ndarray to a vec and create TensorData with explicit shape
-    let data_vec = arr.into_raw_vec_and_offset().0;
     let shape_vec = vec![1, 1, target_height as usize, target_width as usize];
-    
-    // Create tensor using from_data which accepts anything that implements Into<TensorData>
-    let tensor_data = burn::tensor::TensorData::new(data_vec, shape_vec);
+    let tensor_data = TensorData::new(data, shape_vec);
     
     Tensor::<B, 4>::from_data(tensor_data.convert::<f32>(), &device)
 }

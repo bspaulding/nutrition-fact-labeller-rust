@@ -9,12 +9,11 @@ env_logger = "0.11.8"
 futures-util = "0.3.31"
 image = "0.25.7"
 log = "0.4.28"
-# Burn deep learning framework with exact candle-core version to match burn-import
-burn = { version = "0.20.1", features = ["ndarray"] }
-burn-ndarray = "0.20.1"
+# Burn deep learning framework with Candle backend for better performance
+burn = { version = "0.20.1", features = ["candle"] }
+burn-candle = "0.20.1"
 burn-import = { version = "0.20.1", features = ["onnx"] }
 burn-store = { version = "0.20.1", features = ["std"] }
-ndarray = "0.17.2"
 # Pin to exact candle-core version that burn-import expects (workaround for compatibility issue)
 candle-core = "=0.9.1"
 # oar-ocr has been replaced with Burn-based implementation

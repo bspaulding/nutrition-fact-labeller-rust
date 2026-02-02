@@ -4271,8 +4271,8 @@ name = "nutrition-fact-labeller"
 version = "0.1.0"
 dependencies = [
  "burn",
+ "burn-candle",
  "burn-import",
- "burn-ndarray",
  "burn-store",
  "bytes",
  "candle-core",
@@ -4281,7 +4281,6 @@ dependencies = [
  "futures-util",
  "image",
  "log",
- "ndarray 0.17.2",
  "pretty_assertions",
  "regex",
  "serde",
