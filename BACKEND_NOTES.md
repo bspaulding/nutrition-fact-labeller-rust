@@ -130,7 +130,7 @@ If you can't install libtorch or prefer pure Rust:
 [dependencies]
 burn = { version = "0.20.1", features = ["ndarray"] }
 burn-ndarray = "0.20.1"
-# Remove: tch = "0.18"
+# Note: Change from features = ["tch"] to features = ["ndarray"]
 ```
 
 **2. Update src/burn_ocr.rs:**
