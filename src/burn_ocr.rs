@@ -1,14 +1,15 @@
 use burn::tensor::{Tensor, TensorData};
-use burn::backend::libtorch::{LibTorch, LibTorchDevice};
+use burn::backend::ndarray::NdArray;
 use image::RgbImage;
 use log::debug;
 
 use crate::MyTextRegion;
 
-// Type alias for the backend we're using - LibTorch for 5-20x better performance
-// LibTorch supports all operations including adaptive_avg_pool2d
-// Requires libtorch C++ library to be installed on the system
-type B = LibTorch;
+// Type alias for the backend we're using - NdArray for complete operation support
+// Note: Candle backend doesn't support adaptive_avg_pool2d used in these ONNX models
+// Note: LibTorch backend requires external libtorch C++ library
+// NdArray is slower but has full operation coverage and no external dependencies
+type B = NdArray<f32>;
 
 /// Preprocess an RGB image for the detection model
 /// The detection model expects input shape [1, 3, H, W] with values normalized to [0, 1]
@@ -46,7 +47,7 @@ fn preprocess_image_for_detection(img: &RgbImage) -> Tensor<B, 4> {
     
     // Convert to Burn tensor with explicit shape specification
     // This ensures proper NCHW layout interpretation
-    let device = LibTorchDevice::Cpu;
+    let device = Default::default();
     
     // Create TensorData with explicit shape specification
     let shape_vec = vec![1, 3, target_size as usize, target_size as usize];
@@ -171,7 +172,7 @@ fn preprocess_region_for_recognition(
     }
     
     // Create TensorData with shape [1, 1, H, W]
-    let device = LibTorchDevice::Cpu;
+    let device = Default::default();
     let shape_vec = vec![1, 1, target_height as usize, target_width as usize];
     let tensor_data = TensorData::new(data, shape_vec);
     
