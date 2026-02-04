@@ -51,9 +51,12 @@ fn preprocess_image_for_detection(img: &RgbImage) -> Tensor<B, 4> {
     
     // Create TensorData with explicit shape specification
     let shape_vec = vec![1, 3, target_size as usize, target_size as usize];
+    debug!("Creating detection tensor with shape: {:?}, data length: {}", shape_vec, data_vec.len());
     let tensor_data = TensorData::new(data_vec, shape_vec);
     
-    Tensor::<B, 4>::from_data(tensor_data.convert::<f32>(), &device)
+    let tensor = Tensor::<B, 4>::from_data(tensor_data.convert::<f32>(), &device);
+    debug!("Detection tensor shape: {:?}", tensor.shape());
+    tensor
 }
 
 /// Post-process detection model output to extract text regions
