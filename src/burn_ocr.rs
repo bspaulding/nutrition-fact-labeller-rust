@@ -161,25 +161,32 @@ fn preprocess_region_for_recognition(
         image::imageops::FilterType::Lanczos3,
     );
     
-    // Convert to grayscale and normalize to [-1, 1]
-    let mut data = Vec::with_capacity((target_height * target_width) as usize);
+    // Create RGB tensor data in NCHW format and normalize to [-1, 1]
+    // The recognition model expects 3 channels (RGB), not grayscale
+    let mut data_vec = Vec::with_capacity(3 * target_height as usize * target_width as usize);
     
-    for y in 0..target_height {
-        for x in 0..target_width {
-            let pixel = img_resized.get_pixel(x, y);
-            // Convert to grayscale and normalize to [-1, 1]
-            let gray = (0.299 * pixel[0] as f32 + 0.587 * pixel[1] as f32 + 0.114 * pixel[2] as f32) / 255.0;
-            let normalized = (gray - 0.5) / 0.5; // Normalize to [-1, 1]
-            data.push(normalized);
+    // Fill in the data in NCHW format (all of channel 0, then all of channel 1, then channel 2)
+    for c in 0..3 {
+        for y in 0..target_height {
+            for x in 0..target_width {
+                let pixel = img_resized.get_pixel(x, y);
+                let value = pixel[c as usize] as f32 / 255.0;
+                // Normalize to [-1, 1]
+                let normalized = (value - 0.5) / 0.5;
+                data_vec.push(normalized);
+            }
         }
     }
     
-    // Create TensorData with shape [1, 1, H, W]
+    // Create TensorData with shape [1, 3, H, W]
     let device = Default::default();
-    let shape_vec = vec![1, 1, target_height as usize, target_width as usize];
-    let tensor_data = TensorData::new(data, shape_vec);
+    let shape_vec = vec![1, 3, target_height as usize, target_width as usize];
+    debug!("Creating recognition tensor with shape: {:?}, data length: {}", shape_vec, data_vec.len());
+    let tensor_data = TensorData::new(data_vec, shape_vec);
     
-    Tensor::<B, 4>::from_data(tensor_data.convert::<f32>(), &device)
+    let tensor = Tensor::<B, 4>::from_data(tensor_data.convert::<f32>(), &device);
+    debug!("Recognition tensor shape: {:?}", tensor.shape());
+    tensor
 }
 
 /// Post-process recognition model output to extract text using CTC decoding
