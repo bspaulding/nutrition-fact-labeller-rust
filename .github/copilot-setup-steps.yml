@@ -1,4 +1,4 @@
-steps:
+tasks:
   - name: install-hooks
     description: Install git pre-push hook for cargo format, test, and lint checks
     command: bash install-hooks.sh
