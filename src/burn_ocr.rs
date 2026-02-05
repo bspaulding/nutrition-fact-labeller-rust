@@ -163,8 +163,10 @@ fn preprocess_region_for_recognition(
     let aspect_ratio = w as f32 / h as f32;
     let target_width = (target_height as f32 * aspect_ratio) as u32;
     // Ensure minimum width of 100 to avoid pooling issues, clamp maximum to 320
-    // PaddleOCR recognition models use multiple pooling layers that require larger minimum dimensions
-    let target_width = target_width.max(100).min(320); // Increased minimum from 48 to 100
+    // Limit to reasonable max to avoid tensor overflow in pooling operations
+    let target_width = target_width.max(100).min(240); // Reduced max from 320 to 240
+    
+    debug!("Recognition input tensor will be: [1, 3, {}, {}]", target_height, target_width);
     
     let img_resized = image::imageops::resize(
         &cropped,
