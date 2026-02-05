@@ -342,9 +342,20 @@ pub fn run_ocr_burn(image: RgbImage) -> Result<Vec<MyTextRegion>, String> {
         // Preprocess region for recognition
         let recognition_input = preprocess_region_for_recognition(&image, *bbox);
         
-        // Run recognition model
+        // Run recognition model with panic catching
+        // NdArray backend can overflow on pooling operations with certain dimensions
         debug!("Running recognition model for region {}...", idx);
-        let recognition_output = recognition_model.forward(recognition_input);
+        let recognition_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            recognition_model.forward(recognition_input)
+        }));
+        
+        let recognition_output = match recognition_result {
+            Ok(output) => output,
+            Err(_) => {
+                debug!("Recognition model panicked for region {} - skipping (likely pooling overflow)", idx);
+                continue;
+            }
+        };
         
         // Post-process recognition
         let (text, confidence) = postprocess_recognition(recognition_output, &dictionary);
