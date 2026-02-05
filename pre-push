@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pre-push hook that runs cargo format, test, and lint checks
+# Pre-push hook that runs cargo fmt, test, and clippy
 
 set -e
 
