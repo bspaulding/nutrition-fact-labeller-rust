@@ -1,0 +1,60 @@
+tasks:
+  - name: setup-dev-hooks
+    description: Install git pre-push hook to run cargo format, test, and lint checks
+    command: |
+      #!/bin/bash
+      set -e
+      
+      # Create the pre-push hook
+      HOOK_FILE=".git/hooks/pre-push"
+      
+      cat > "$HOOK_FILE" << 'EOF'
+      #!/bin/bash
+      
+      # Pre-push hook for nutrition-fact-labeller-rust
+      # This hook runs cargo fmt, cargo test, and cargo clippy before pushing
+      
+      set -e
+      
+      echo "Running pre-push checks..."
+      
+      # Check formatting
+      echo "🔍 Checking code formatting with cargo fmt..."
+      if ! cargo fmt --check; then
+        echo "❌ Code formatting check failed!"
+        echo "   Run 'cargo fmt' to fix formatting issues."
+        exit 1
+      fi
+      echo "✅ Code formatting check passed"
+      
+      # Run tests
+      echo "🧪 Running tests with cargo test..."
+      if ! cargo test; then
+        echo "❌ Tests failed!"
+        exit 1
+      fi
+      echo "✅ Tests passed"
+      
+      # Run linter
+      echo "📋 Running linter with cargo clippy..."
+      if ! cargo clippy -- -D warnings; then
+        echo "❌ Linting failed!"
+        echo "   Run 'cargo clippy' to see and fix linting issues."
+        exit 1
+      fi
+      echo "✅ Linting passed"
+      
+      echo "🎉 All pre-push checks passed!"
+      EOF
+      
+      # Make the hook executable
+      chmod +x "$HOOK_FILE"
+      
+      echo "✅ Pre-push git hook installed successfully at $HOOK_FILE"
+      echo ""
+      echo "The hook will run the following checks before each push:"
+      echo "  - cargo fmt --check (code formatting)"
+      echo "  - cargo test (run tests)"
+      echo "  - cargo clippy -- -D warnings (linting)"
+      echo ""
+      echo "To bypass the hook in emergency situations, use: git push --no-verify"
