@@ -1,26 +1,28 @@
-use std::time::Instant;
-use log::{info, debug};
-use std::collections::HashMap;
-use serde_derive::{Deserialize, Serialize};
+use bytes::BufMut;
+use futures_util::TryStreamExt;
+use log::{debug, info};
+use oar_ocr::core::config::onnx::{
+    OrtExecutionProvider, OrtGraphOptimizationLevel, OrtSessionConfig,
+};
 use oar_ocr::prelude::*;
+use oar_ocr::utils::image::dynamic_to_rgb;
+use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::time::Instant;
 use warp::Filter;
 use warp::multipart::FormData;
-use futures_util::TryStreamExt;
-use bytes::BufMut;
-use oar_ocr::utils::image::dynamic_to_rgb;
-use oar_ocr::core::config::onnx::{OrtSessionConfig, OrtExecutionProvider, OrtGraphOptimizationLevel};
 mod spellcheck;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MyTextRegion {
     pub text: String,
-    pub confidence: f32
+    pub confidence: f32,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct OCRResult {
     pub filename: String,
-    pub regions: Vec<MyTextRegion>
+    pub regions: Vec<MyTextRegion>,
 }
 
 fn ort_config() -> OrtSessionConfig {
@@ -32,7 +34,7 @@ fn ort_config() -> OrtSessionConfig {
         .with_execution_providers(vec![
             // is coreml weird?
             // OrtExecutionProvider::CoreML { ane_only: Some(true), subgraphs: Some(true) },
-            OrtExecutionProvider::CPU,  // Fallback to CPU
+            OrtExecutionProvider::CPU, // Fallback to CPU
         ]);
 }
 
@@ -50,34 +52,35 @@ fn run_ocr_rgb(image: image::RgbImage) -> Result<Vec<MyTextRegion>, String> {
     // let recognition_model = "paddleocr-models/ppocrv5_server_rec.onnx".to_string();
     // let dictionary = "paddleocr-models/ppocrv5_dict.txt".to_string();
 
-    let ocr = OAROCRBuilder::new(
-        detection_model,
-        recognition_model,
-        dictionary,
-    )
-    // Configure document orientation with confidence threshold
-    .doc_orientation_classify_model_path("paddleocr-models/pplcnet_x1_0_doc_ori.onnx")
-    .doc_orientation_threshold(0.8) // Only accept predictions with 80% confidence
-    .use_doc_orientation_classify(true)
-    // Configure text line orientation with confidence threshold
-    .textline_orientation_classify_model_path("paddleocr-models/pplcnet_x1_0_textline_ori.onnx")
-    .textline_orientation_threshold(0.7) // Only accept predictions with 70% confidence
-    .use_textline_orientation(true)
-    // configure document rectification
-    .doc_unwarping_model_path("paddleocr-models/uvdoc.onnx")
-    .use_doc_unwarping(true)
-    // more expanding for bigger boxes
-    .text_det_unclip_ratio(3.0)
-    .global_ort_session(ort_config())
-    .build()
-    .map_err(|_| "Failed to build ocr model".to_string())?;
+    let ocr = OAROCRBuilder::new(detection_model, recognition_model, dictionary)
+        // Configure document orientation with confidence threshold
+        .doc_orientation_classify_model_path("paddleocr-models/pplcnet_x1_0_doc_ori.onnx")
+        .doc_orientation_threshold(0.8) // Only accept predictions with 80% confidence
+        .use_doc_orientation_classify(true)
+        // Configure text line orientation with confidence threshold
+        .textline_orientation_classify_model_path("paddleocr-models/pplcnet_x1_0_textline_ori.onnx")
+        .textline_orientation_threshold(0.7) // Only accept predictions with 70% confidence
+        .use_textline_orientation(true)
+        // configure document rectification
+        .doc_unwarping_model_path("paddleocr-models/uvdoc.onnx")
+        .use_doc_unwarping(true)
+        // more expanding for bigger boxes
+        .text_det_unclip_ratio(3.0)
+        .global_ort_session(ort_config())
+        .build()
+        .map_err(|_| "Failed to build ocr model".to_string())?;
 
-    let results = ocr.predict(&[image])
-        .map_err(|_| "Failed to predict")?;
+    let results = ocr.predict(&[image]).map_err(|_| "Failed to predict")?;
     let result = &results[0];
     let regions = &result.text_regions;
 
-    return Ok(regions.iter().map(|tr| MyTextRegion { text: tr.text.clone().unwrap().to_string(), confidence: tr.confidence.unwrap() }).collect());
+    return Ok(regions
+        .iter()
+        .map(|tr| MyTextRegion {
+            text: tr.text.clone().unwrap().to_string(),
+            confidence: tr.confidence.unwrap(),
+        })
+        .collect());
 }
 
 #[tokio::main]
@@ -88,8 +91,7 @@ async fn main() {
     // let hello = warp::path!("hello" / String)
     //     .map(|name| format!("Hello, {}!", name));
 
-    let upload = warp::multipart::form()
-        .and_then(|form: FormData| async move {
+    let upload = warp::multipart::form().and_then(|form: FormData| async move {
         let field_names: Vec<_> = form
             .and_then(|mut field| async move {
                 let mut bytes: Vec<u8> = Vec::new();
@@ -106,8 +108,8 @@ async fn main() {
                     field.name().to_string(),
                     OCRResult {
                         filename: field.filename().unwrap().to_string(),
-                        regions: trs.unwrap()
-                    }
+                        regions: trs.unwrap(),
+                    },
                 ))
             })
             .try_collect()
@@ -122,13 +124,13 @@ async fn main() {
         Ok::<_, warp::Rejection>(warp::reply::json(&map))
     });
 
-    let port: u16 = std::env::var("PORT").ok().and_then(|p| p.parse::<u16>().ok()).unwrap_or(3030);
+    let port: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+        .unwrap_or(3030);
     info!("running and listening on {port}");
 
-    let server = warp::serve(upload)
-        .bind(([0, 0, 0, 0], port))
-        .await
-        .run();
+    let server = warp::serve(upload).bind(([0, 0, 0, 0], port)).await.run();
 
     tokio::select! {
         _ = server => {},
@@ -152,11 +154,20 @@ fn parse_facts_from_regions(regions: Vec<MyTextRegion>) -> ParsedNutritionFacts 
     let texts: Vec<&str> = regions.iter().map(|x| x.text.as_str()).collect();
     let dictionary = spellcheck::dictionary();
     let spellchecked: Vec<String> = timeit("spellchecking", || {
-        texts.iter().map(|s| s.split_whitespace().map(|w: &str| {
-            spellcheck::correction(&w, &dictionary)
-        }).collect::<Vec<&str>>().join(" ")).collect()
+        texts
+            .iter()
+            .map(|s| {
+                s.split_whitespace()
+                    .map(|w: &str| spellcheck::correction(&w, &dictionary))
+                    .collect::<Vec<&str>>()
+                    .join(" ")
+            })
+            .collect()
     });
-    debug!("{:#?}", std::iter::zip(texts.clone(), spellchecked.clone()).collect::<Vec<(&str, String)>>());
+    debug!(
+        "{:#?}",
+        std::iter::zip(texts.clone(), spellchecked.clone()).collect::<Vec<(&str, String)>>()
+    );
     return parse_facts(spellchecked.iter().map(|s| s.as_str()).collect());
 }
 
@@ -185,11 +196,7 @@ struct LabelledValue {
 }
 
 // Helper to find a value by label predicate
-fn find_labelled_value<T, F, C>(
-    xs: &[LabelledValue],
-    flabel: F,
-    convert: C,
-) -> Option<T>
+fn find_labelled_value<T, F, C>(xs: &[LabelledValue], flabel: F, convert: C) -> Option<T>
 where
     F: Fn(&str) -> bool,
     C: Fn(&str) -> Option<T>,
@@ -240,7 +247,7 @@ pub fn parse_facts(content: Vec<&str>) -> ParsedNutritionFacts {
                 results.push(LabelledValue {
                     label: format!("{previous_label} added sugars"),
                     value: lvalue.value,
-                    unit: lvalue.unit
+                    unit: lvalue.unit,
                 });
             }
             continue;
@@ -253,7 +260,7 @@ pub fn parse_facts(content: Vec<&str>) -> ParsedNutritionFacts {
                 results.push(LabelledValue {
                     label: format!("serving size {previous_label}"),
                     value: lvalue.value,
-                    unit: lvalue.unit
+                    unit: lvalue.unit,
                 });
             }
             continue;
@@ -297,16 +304,36 @@ pub fn parse_facts(content: Vec<&str>) -> ParsedNutritionFacts {
     debug!("{:#?}", results);
 
     ParsedNutritionFacts {
-        servings_per_container: find_labelled_value(&results, ends_with("servings per container"), |s| s.parse::<f64>().ok()),
-        serving_size_grams: find_labelled_value(&results, starts_with("serving size"), |s| s.parse::<f64>().ok()),
+        servings_per_container: find_labelled_value(
+            &results,
+            ends_with("servings per container"),
+            |s| s.parse::<f64>().ok(),
+        ),
+        serving_size_grams: find_labelled_value(&results, starts_with("serving size"), |s| {
+            s.parse::<f64>().ok()
+        }),
         calories: find_labelled_value(&results, starts_with("calories"), |s| s.parse::<i32>().ok()),
-        total_fat_grams: find_labelled_value(&results, starts_with("total fat"), |s| s.parse::<f64>().ok()),
-        cholesterol_mg: find_labelled_value(&results, starts_with("cholesterol"), |s| s.parse::<f64>().ok()),
+        total_fat_grams: find_labelled_value(&results, starts_with("total fat"), |s| {
+            s.parse::<f64>().ok()
+        }),
+        cholesterol_mg: find_labelled_value(&results, starts_with("cholesterol"), |s| {
+            s.parse::<f64>().ok()
+        }),
         sodium_mg: find_labelled_value(&results, starts_with("sodium"), |s| s.parse::<f64>().ok()),
-        total_carbohydrates_g: find_labelled_value(&results, starts_with("total carbohydrate"), |s| s.parse::<f64>().ok()),
-        dietary_fiber_g: find_labelled_value(&results, starts_with("dietary fiber"), |s| s.parse::<f64>().ok()),
-        total_sugars_g: find_labelled_value(&results, starts_with("total sugars"), |s| s.parse::<f64>().ok()),
-        added_sugars_g: find_labelled_value(&results, contains("added sugars"), |s| s.parse::<f64>().ok()),
+        total_carbohydrates_g: find_labelled_value(
+            &results,
+            starts_with("total carbohydrate"),
+            |s| s.parse::<f64>().ok(),
+        ),
+        dietary_fiber_g: find_labelled_value(&results, starts_with("dietary fiber"), |s| {
+            s.parse::<f64>().ok()
+        }),
+        total_sugars_g: find_labelled_value(&results, starts_with("total sugars"), |s| {
+            s.parse::<f64>().ok()
+        }),
+        added_sugars_g: find_labelled_value(&results, contains("added sugars"), |s| {
+            s.parse::<f64>().ok()
+        }),
         protein_g: find_labelled_value(&results, starts_with("protein"), |s| s.parse::<f64>().ok()),
     }
 }
@@ -390,7 +417,7 @@ mod tests {
             ("s0dium", "sodium"),
             ("t0tal", "total"),
             ("lotal", "total"),
-            ("notinthedict", "notinthedict")
+            ("notinthedict", "notinthedict"),
         ];
 
         for t in &tests {
