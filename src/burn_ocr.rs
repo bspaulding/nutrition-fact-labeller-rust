@@ -162,9 +162,9 @@ fn preprocess_region_for_recognition(
     let target_height = 32;
     let aspect_ratio = w as f32 / h as f32;
     let target_width = (target_height as f32 * aspect_ratio) as u32;
-    // Ensure minimum width of 100 to avoid pooling issues, clamp maximum to 320
-    // Limit to reasonable max to avoid tensor overflow in pooling operations
-    let target_width = target_width.max(100).min(240); // Reduced max from 320 to 240
+    // Ensure minimum width of 100, limit max to 160 to avoid pooling tensor overflow
+    // Even with [1,3,32,100] input, pooling operations can create large intermediate tensors
+    let target_width = target_width.max(100).min(160); // Further reduced from 240 to 160
     
     debug!("Recognition input tensor will be: [1, 3, {}, {}]", target_height, target_width);
     
