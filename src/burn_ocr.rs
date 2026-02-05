@@ -99,9 +99,9 @@ fn postprocess_detection(output: Tensor<B, 4>) -> Vec<(u32, u32, u32, u32)> {
     
     // Scan the probability map for regions above threshold
     // Use larger windows to ensure regions are big enough for recognition model
-    let window_size = 64;  // Increased from 32 to ensure minimum size
-    let stride = 32;       // Increased stride
-    let min_region_size = 48;  // Minimum width/height for a valid region
+    let window_size = 80;  // Increased from 64 to ensure minimum size for recognition
+    let stride = 40;       // Increased stride proportionally
+    let min_region_size = 64;  // Minimum width/height for a valid region (increased from 48)
     
     for y in (0..height).step_by(stride) {
         for x in (0..width).step_by(stride) {
@@ -136,8 +136,8 @@ fn postprocess_detection(output: Tensor<B, 4>) -> Vec<(u32, u32, u32, u32)> {
     if regions.is_empty() {
         // Fallback: return one large region covering most of the image
         debug!("No regions detected, using fallback region");
-        let fallback_w = (width as u32).saturating_sub(100).max(100);
-        let fallback_h = (height as u32).saturating_sub(100).max(50);
+        let fallback_w = (width as u32).saturating_sub(100).max(150);  // Increased minimum from 100 to 150
+        let fallback_h = (height as u32).saturating_sub(100).max(80);  // Increased minimum from 50 to 80
         vec![(50, 50, fallback_w, fallback_h)]
     } else {
         debug!("Detected {} regions", regions.len());
@@ -160,8 +160,9 @@ fn preprocess_region_for_recognition(
     let target_height = 32;
     let aspect_ratio = w as f32 / h as f32;
     let target_width = (target_height as f32 * aspect_ratio) as u32;
-    // Ensure minimum width of 48 to avoid pooling issues, clamp maximum to 320
-    let target_width = target_width.max(48).min(320); // Clamp width with higher minimum
+    // Ensure minimum width of 100 to avoid pooling issues, clamp maximum to 320
+    // PaddleOCR recognition models use multiple pooling layers that require larger minimum dimensions
+    let target_width = target_width.max(100).min(320); // Increased minimum from 48 to 100
     
     let img_resized = image::imageops::resize(
         &cropped,
