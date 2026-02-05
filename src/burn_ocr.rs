@@ -98,8 +98,10 @@ fn postprocess_detection(output: Tensor<B, 4>) -> Vec<(u32, u32, u32, u32)> {
     let mut regions = Vec::new();
     
     // Scan the probability map for regions above threshold
-    let window_size = 32;
-    let stride = 16;
+    // Use larger windows to ensure regions are big enough for recognition model
+    let window_size = 64;  // Increased from 32 to ensure minimum size
+    let stride = 32;       // Increased stride
+    let min_region_size = 48;  // Minimum width/height for a valid region
     
     for y in (0..height).step_by(stride) {
         for x in (0..width).step_by(stride) {
@@ -121,16 +123,22 @@ fn postprocess_detection(output: Tensor<B, 4>) -> Vec<(u32, u32, u32, u32)> {
             if avg > threshold {
                 let w = window_size.min(width - x) as u32;
                 let h = window_size.min(height - y) as u32;
-                regions.push((x as u32, y as u32, w, h));
+                
+                // Only add regions that meet minimum size requirements
+                if w >= min_region_size && h >= min_region_size {
+                    regions.push((x as u32, y as u32, w, h));
+                }
             }
         }
     }
     
     // Merge overlapping regions (simple approach)
     if regions.is_empty() {
-        // Fallback: return one region covering most of the image
+        // Fallback: return one large region covering most of the image
         debug!("No regions detected, using fallback region");
-        vec![(50, 50, width as u32 - 100, height as u32 - 100)]
+        let fallback_w = (width as u32).saturating_sub(100).max(100);
+        let fallback_h = (height as u32).saturating_sub(100).max(50);
+        vec![(50, 50, fallback_w, fallback_h)]
     } else {
         debug!("Detected {} regions", regions.len());
         regions
@@ -152,7 +160,8 @@ fn preprocess_region_for_recognition(
     let target_height = 32;
     let aspect_ratio = w as f32 / h as f32;
     let target_width = (target_height as f32 * aspect_ratio) as u32;
-    let target_width = target_width.max(32).min(320); // Clamp width
+    // Ensure minimum width of 48 to avoid pooling issues, clamp maximum to 320
+    let target_width = target_width.max(48).min(320); // Clamp width with higher minimum
     
     let img_resized = image::imageops::resize(
         &cropped,
@@ -316,7 +325,14 @@ pub fn run_ocr_burn(image: RgbImage) -> Result<Vec<MyTextRegion>, String> {
     let mut results = Vec::new();
     
     for (idx, bbox) in bboxes.iter().enumerate() {
-        debug!("Processing region {}: {:?}", idx, bbox);
+        let (x, y, w, h) = *bbox;
+        debug!("Processing region {}: ({}, {}, {}, {})", idx, x, y, w, h);
+        
+        // Skip regions that are too small (safety check)
+        if w < 32 || h < 16 {
+            debug!("Skipping region {} - too small: {}x{}", idx, w, h);
+            continue;
+        }
         
         // Preprocess region for recognition
         let recognition_input = preprocess_region_for_recognition(&image, *bbox);
