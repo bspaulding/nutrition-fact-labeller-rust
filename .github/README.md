@@ -52,7 +52,9 @@ git push --no-verify
 Before each push, the hook will:
 
 1. ✅ Check that your code is properly formatted
-2. ✅ Run all tests to ensure they pass
-3. ✅ Run clippy linter to catch common issues
+2. ✅ Run all tests to ensure they pass (skips if build dependencies are unavailable)
+3. ✅ Run clippy linter to catch common issues (skips if build dependencies are unavailable)
 
 If any check fails, the push will be blocked and you'll see an error message explaining what needs to be fixed.
+
+**Note:** The hook is smart about build/dependency issues. If tests or linting can't run due to missing dependencies or network issues (common in CI environments), the hook will warn but allow the push to continue. However, actual code formatting errors, test failures, or linting issues will block the push.
