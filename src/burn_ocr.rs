@@ -136,8 +136,10 @@ fn postprocess_detection(output: Tensor<B, 4>) -> Vec<(u32, u32, u32, u32)> {
     if regions.is_empty() {
         // Fallback: return one large region covering most of the image
         debug!("No regions detected, using fallback region");
-        let fallback_w = (width as u32).saturating_sub(100).max(150);  // Increased minimum from 100 to 150
-        let fallback_h = (height as u32).saturating_sub(100).max(80);  // Increased minimum from 50 to 80
+        // Fallback region: ensure reasonable dimensions that won't overflow after resizing
+        // Limit width to avoid tensor overflow issues in pooling operations
+        let fallback_w = ((width as u32).saturating_sub(100).max(150)).min(640);  // Cap at 640 pixels
+        let fallback_h = ((height as u32).saturating_sub(100).max(80)).min(320);   // Cap at 320 pixels
         vec![(50, 50, fallback_w, fallback_h)]
     } else {
         debug!("Detected {} regions", regions.len());
