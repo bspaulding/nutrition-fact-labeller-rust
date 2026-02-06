@@ -22,12 +22,14 @@ jobs:
         with:
           toolchain: stable
       
-      - name: Install LavaPipe (software Vulkan for WGPU)
+      - name: Install LavaPipe and OpenGL support for WGPU
         run: |
           sudo apt-get update
-          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools libgl1-mesa-dri libegl1-mesa
           # Verify Vulkan is available (should show llvmpipe/LavaPipe)
-          vulkaninfo --summary || echo "Vulkan info not available, but LavaPipe should work"
+          vulkaninfo --summary || echo "Vulkan info not available"
+          # Check for OpenGL support as fallback
+          glxinfo | grep "OpenGL" | head -5 || echo "OpenGL info not available"
       
       - name: Download ONNX models
         run: |
@@ -64,8 +66,12 @@ jobs:
       - name: Run cargo test
         run: cargo test --release --verbose
         env:
-          # Configure WGPU to use LavaPipe (software Vulkan) on CI runners without GPU
-          WGPU_BACKEND: vulkan
+          # Configure WGPU to fallback to GL if Vulkan not available
+          # Try Vulkan first (with LavaPipe), fallback to GL
+          WGPU_BACKEND: gl
           VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+          # Enable software rendering
+          LIBGL_ALWAYS_SOFTWARE: 1
+          GALLIUM_DRIVER: llvmpipe
           # Run tests in release mode for better performance
           RUST_TEST_THREADS: 1
