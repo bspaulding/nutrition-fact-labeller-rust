@@ -22,6 +22,13 @@ jobs:
         with:
           toolchain: stable
       
+      - name: Install LavaPipe (software Vulkan for WGPU)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools
+          # Verify Vulkan is available (should show llvmpipe/LavaPipe)
+          vulkaninfo --summary || echo "Vulkan info not available, but LavaPipe should work"
+      
       - name: Download ONNX models
         run: |
           mkdir -p models
@@ -55,8 +62,10 @@ jobs:
             ${{ runner.os }}-cargo-build-target-
       
       - name: Run cargo test
-        run: cargo test --verbose
+        run: cargo test --release --verbose
         env:
-          # Increase test timeout to 10 minutes for slow Burn NdArray backend
+          # Configure WGPU to use LavaPipe (software Vulkan) on CI runners without GPU
+          WGPU_BACKEND: vulkan
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+          # Run tests in release mode for better performance
           RUST_TEST_THREADS: 1
-          RUST_TEST_TIME_UNIT: 60000
