@@ -9,7 +9,17 @@ env_logger = "0.11.8"
 futures-util = "0.3.31"
 image = "0.25.7"
 log = "0.4.28"
-oar-ocr = { version = "0.2.2" }
+# Burn deep learning framework with WGPU backend
+# WGPU provides GPU acceleration via WebGPU API
+# Works on multiple platforms (Windows, Linux, macOS, Web)
+# No external C++ dependencies like LibTorch
+burn = { version = "0.20.1", features = ["wgpu"] }
+burn-wgpu = "0.20.1"
+burn-import = { version = "0.20.1", features = ["onnx"] }
+burn-store = { version = "0.20.1", features = ["std"] }
+# Pin to exact candle-core version that burn-import expects (workaround for compatibility issue)
+candle-core = "=0.9.1"
+# oar-ocr has been replaced with Burn-based implementation
 pretty_assertions = "1.4.1"
 regex = "1.11.2"
 serde = { version = "1.0.219", features = ["serde_derive"] }
@@ -17,6 +27,10 @@ serde_derive = "1.0.219"
 strsim = "0.11.1"
 tokio = { version = "1", features = ["full"] }
 warp = { version = "0.4", features = ["server", "multipart"] }
+
+[build-dependencies]
+burn-import = { version = "0.20.1", features = ["onnx"] }
+candle-core = "=0.9.1"
 
 [dev-dependencies]
 csv = "1.3.1"
