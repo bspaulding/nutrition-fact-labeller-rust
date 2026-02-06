@@ -9,12 +9,12 @@ env_logger = "0.11.8"
 futures-util = "0.3.31"
 image = "0.25.7"
 log = "0.4.28"
-# Burn deep learning framework with NdArray backend
-# Note: Candle backend doesn't support adaptive_avg_pool2d operation used in these models
-# Note: LibTorch backend requires libtorch C++ library installation
-# NdArray is slower but has complete operation support and no external dependencies
-burn = { version = "0.20.1", features = ["ndarray"] }
-burn-ndarray = "0.20.1"
+# Burn deep learning framework with WGPU backend
+# WGPU provides GPU acceleration via WebGPU API
+# Works on multiple platforms (Windows, Linux, macOS, Web)
+# No external C++ dependencies like LibTorch
+burn = { version = "0.20.1", features = ["wgpu"] }
+burn-wgpu = "0.20.1"
 burn-import = { version = "0.20.1", features = ["onnx"] }
 burn-store = { version = "0.20.1", features = ["std"] }
 # Pin to exact candle-core version that burn-import expects (workaround for compatibility issue)

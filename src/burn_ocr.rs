@@ -1,15 +1,15 @@
 use burn::tensor::{Tensor, TensorData};
-use burn::backend::ndarray::NdArray;
+use burn::backend::wgpu::{Wgpu, WgpuDevice};
 use image::RgbImage;
 use log::debug;
 
 use crate::MyTextRegion;
 
-// Type alias for the backend we're using - NdArray for complete operation support
-// Note: Candle backend doesn't support adaptive_avg_pool2d used in these ONNX models
-// Note: LibTorch backend requires external libtorch C++ library
-// NdArray is slower but has full operation coverage and no external dependencies
-type B = NdArray<f32>;
+// Type alias for the backend we're using - WGPU for GPU acceleration
+// WGPU provides cross-platform GPU acceleration via WebGPU API
+// Works on Windows, Linux, macOS, and Web
+// No external C++ dependencies
+type B = Wgpu;
 
 /// Preprocess an RGB image for the detection model
 /// The detection model expects input shape [1, 3, H, W] with values normalized to [0, 1]
@@ -47,7 +47,7 @@ fn preprocess_image_for_detection(img: &RgbImage) -> Tensor<B, 4> {
     
     // Convert to Burn tensor with explicit shape specification
     // This ensures proper NCHW layout interpretation
-    let device = Default::default();
+    let device = WgpuDevice::default();
     
     // Create TensorData with explicit shape specification
     let shape_vec = vec![1, 3, target_size as usize, target_size as usize];
@@ -193,7 +193,7 @@ fn preprocess_region_for_recognition(
     }
     
     // Create TensorData with shape [1, 3, H, W]
-    let device = Default::default();
+    let device = WgpuDevice::default();
     let shape_vec = vec![1, 3, target_height as usize, target_width as usize];
     debug!("Creating recognition tensor with shape: {:?}, data length: {}", shape_vec, data_vec.len());
     let tensor_data = TensorData::new(data_vec, shape_vec);
