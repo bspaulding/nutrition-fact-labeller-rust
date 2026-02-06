@@ -61,6 +61,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-build-target-
       
+      - name: Build with WGPU GL backend
+        run: cargo build --release --verbose
+        env:
+          # Configure WGPU to use GL backend with software rendering
+          WGPU_BACKEND: gl
+          # Enable software rendering with llvmpipe
+          LIBGL_ALWAYS_SOFTWARE: 1
+          GALLIUM_DRIVER: llvmpipe
+      
       - name: Run cargo test
         run: cargo test --release --verbose
         env:
